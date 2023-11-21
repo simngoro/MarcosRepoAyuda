@@ -78,3 +78,5 @@ class ProductManager {
   const productIdToFind = 2;
   const foundProduct = productManager.getProductById(productIdToFind);
   console.log("Producto encontrado:", foundProduct);
+  
+  // 
