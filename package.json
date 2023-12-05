@@ -18,7 +18,9 @@
   },
   "homepage": "https://github.com/MarcosMolmedo/programacion-backend-50005#readme",
   "dependencies": {
+    "express": "^4.18.2",
     "fs": "0.0.1-security",
+    "fs.promises": "^0.1.2",
     "jsonfile": "^6.1.0"
   }
 }

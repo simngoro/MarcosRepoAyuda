@@ -5,6 +5,7 @@ class ProductManager {
     this.path = filePath;
     this.loadProducts();
   }
+  
 
   // Método privado para cargar productos desde el archivo
   loadProducts() {
