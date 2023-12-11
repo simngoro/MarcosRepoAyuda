@@ -5,7 +5,6 @@ class ProductManager {
     this.path = filePath;
     this.loadProducts();
   }
-  
 
   // Método privado para cargar productos desde el archivo
   loadProducts() {
@@ -26,12 +25,11 @@ class ProductManager {
 
   // Método para agregar un nuevo producto al conjunto
   addProduct(product) {
-   if (!product.title || !product.description || !product.price || !product.thumbnail || !product.code || !product.stock) {
-    console.error("Todos los campos son obligatorios");
-     return;
+    if (!product.title || !product.description || !product.price || !product.thumbnail || !product.code || !product.stock) {
+      console.error("Todos los campos son obligatorios");
+      return null;
     }
 
-    // Asignar un ID autoincrementable
     const newProduct = {
       id: this.products.length > 0 ? Math.max(...this.products.map(p => p.id)) + 1 : 1,
       ...product,
@@ -40,6 +38,7 @@ class ProductManager {
     this.products.push(newProduct);
     this.saveProducts();
     console.log("Producto agregado:", newProduct);
+    return newProduct;
   }
 
   // Método para obtener todos los productos
@@ -69,8 +68,10 @@ class ProductManager {
       this.products[productIndex] = { ...this.products[productIndex], ...updatedFields };
       this.saveProducts();
       console.log("Producto actualizado:", this.products[productIndex]);
+      return this.products[productIndex];
     } else {
       console.error("Producto no encontrado");
+      return null;
     }
   }
 
@@ -82,34 +83,12 @@ class ProductManager {
       const deletedProduct = this.products.splice(productIndex, 1)[0];
       this.saveProducts();
       console.log("Producto eliminado:", deletedProduct);
+      return deletedProduct;
     } else {
       console.error("Producto no encontrado");
+      return null;
     }
   }
 }
 
-// Ejemplo de uso
-const productManager = new ProductManager('./main.json');
-
-// Obtener todos los productos
-const allProducts = productManager.getProducts();
-console.log("Todos los productos:", allProducts);
-const newproduct = {description:"ultimo producto",thumbnail:"ruta",code:"clases",title:"nuevos productos",  price: 60, stock: 25 };
-productManager.addProduct(newproduct)
-
-// Actualizar producto por ID
-const productIdToUpdate = 1;
-const updatedFields = { price: 60, stock: 25 };
-productManager.updateProduct(productIdToUpdate, updatedFields);
-
-// Obtener todos los productos después de la actualización
-const updatedProducts = productManager.getProducts();
-console.log("Productos después de la actualización:", updatedProducts);
-
-// Eliminar producto por ID
-const productIdToDelete = 1;
-productManager.deleteProduct(productIdToDelete);
-
-// Obtener todos los productos después de la eliminación
-const productsAfterDeletion = productManager.getProducts();
-console.log("Productos después de la eliminación:", productsAfterDeletion);
+module.exports = ProductManager;

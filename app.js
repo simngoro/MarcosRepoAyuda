@@ -1,37 +1,55 @@
 // app.js
-import express from 'express';
-import ProductManager from './main';
+const express = require('express');
+const ProductManager = require('./main');
 
 const app = express();
-const port = 3000;
+const port = 8080;
 
-const productManager = new ProductManager('./main.json');
+app.use(express.json());
 
-// Función asincrónica para cargar productos
-const loadProductsAsync = async () => {
+const productManager = new ProductManager('./productos.json'); 
+
+// Rutas para productos
+const productsRouter = express.Router();
+app.use('/api/products', productsRouter);
+
+productsRouter.get('/', async (req, res) => {
   try {
-    await productManager.loadProducts();
+    const limit = parseInt(req.query.limit);
+    const products = await productManager.getProducts(limit);
+    res.json({ products });
   } catch (error) {
-    console.error('Error al cargar productos:', error.message);
+    console.error('Error al obtener productos:', error.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
-};
-
-// Ruta para consultar productos con soporte para el parámetro limit
-app.get('/products', async (req, res) => {
-  const limit = parseInt(req.query.limit);
-
-  // Cargar productos de manera asincrónica
-  await loadProductsAsync();
-
-  let allProducts = productManager.getProducts();
-
-  if (!isNaN(limit) && limit > 0) {
-    // Si se proporciona un límite válido, limitar la cantidad de productos
-    allProducts = allProducts.slice(0, limit);
-  }
-
-  res.json({ products: allProducts });
 });
+
+productsRouter.get('/:pid', async (req, res) => {
+  try {
+    const product = await productManager.getProductById(req.params.pid);
+    
+    if (product) {
+      res.json({ product });
+    } else {
+      res.status(404).json({ error: 'Producto no encontrado' });
+    }
+  } catch (error) {
+    console.error('Error al obtener producto:', error.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+productsRouter.post('/', async (req, res) => {
+  try {
+    const newProduct = await productManager.addProduct(req.body);
+    res.json({ product: newProduct });
+  } catch (error) {
+    console.error('Error al agregar producto:', error.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Implementa las rutas PUT y DELETE 
 
 // Arrancar el servidor
 app.listen(port, () => {
