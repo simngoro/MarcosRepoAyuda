@@ -6,89 +6,62 @@ class ProductManager {
     this.loadProducts();
   }
 
-  // Método privado para cargar productos desde el archivo
   loadProducts() {
     try {
       const data = fs.readFileSync(this.path, 'utf-8');
       this.products = JSON.parse(data);
     } catch (error) {
-      // Si hay un error (por ejemplo, el archivo no existe), continuamos con un array vacío
       this.products = [];
     }
   }
 
-  // Método privado para guardar productos en el archivo
   saveProducts() {
     const data = JSON.stringify(this.products, null, 2);
     fs.writeFileSync(this.path, data, 'utf-8');
   }
 
-  // Método para agregar un nuevo producto al conjunto
   addProduct(product) {
-    if (!product.title || !product.description || !product.price || !product.thumbnail || !product.code || !product.stock) {
-      console.error("Todos los campos son obligatorios");
-      return null;
-    }
-
-    const newProduct = {
-      id: this.products.length > 0 ? Math.max(...this.products.map(p => p.id)) + 1 : 1,
-      ...product,
-    };
-
-    this.products.push(newProduct);
+    product.id = generateUniqueId(this.products);
+    this.products.push(product);
     this.saveProducts();
-    console.log("Producto agregado:", newProduct);
-    return newProduct;
   }
 
-  // Método para obtener todos los productos
-  getProducts() {
-    this.loadProducts(); // Recargar productos desde el archivo antes de devolverlos
-    return this.products;
-  }
-
-  // Método para obtener un producto por ID
-  getProductById(productId) {
-    this.loadProducts(); // Recargar productos desde el archivo antes de buscar
-    const product = this.products.find(p => p.id === productId);
-
-    if (product) {
-      return product;
-    } else {
-      console.error("Producto no encontrado");
-      return null;
+  getProducts(limit) {
+    let allProducts = this.products;
+    if (!isNaN(limit) && limit > 0) {
+      allProducts = allProducts.slice(0, limit);
     }
+    return allProducts;
   }
 
-  // Método para actualizar un producto por ID
-  updateProduct(productId, updatedFields) {
-    const productIndex = this.products.findIndex(p => p.id === productId);
+  getProductById(productId) {
+    return this.products.find(product => product.id === productId);
+  }
 
+  updateProduct(productId, updatedFields) {
+    const productIndex = this.products.findIndex(product => product.id === productId);
     if (productIndex !== -1) {
       this.products[productIndex] = { ...this.products[productIndex], ...updatedFields };
       this.saveProducts();
-      console.log("Producto actualizado:", this.products[productIndex]);
       return this.products[productIndex];
-    } else {
-      console.error("Producto no encontrado");
-      return null;
     }
+    return null;
   }
 
-  // Método para eliminar un producto por ID
   deleteProduct(productId) {
-    const productIndex = this.products.findIndex(p => p.id === productId);
-
-    if (productIndex !== -1) {
-      const deletedProduct = this.products.splice(productIndex, 1)[0];
-      this.saveProducts();
-      console.log("Producto eliminado:", deletedProduct);
-      return deletedProduct;
-    } else {
-      console.error("Producto no encontrado");
-      return null;
-    }
+    const deletedProduct = this.products.filter(product => product.id === productId)[0];
+    this.products = this.products.filter(product => product.id !== productId);
+    this.saveProducts();
+    return deletedProduct;
   }
 }
 
-module.exports = ProductManager;
+function generateUniqueId(existingProducts) {
+  let newId;
+  do {
+    newId = Math.floor(Math.random() * 1000);
+  } while (existingProducts.some(product => product.id === newId));
+  return newId;
+}
+
+module.exports = { ProductManager, generateUniqueId };
