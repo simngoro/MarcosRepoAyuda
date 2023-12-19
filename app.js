@@ -1,9 +1,18 @@
 const express = require('express');
+const exphbs = require('express-handlebars');
+const expressWs = require('express-ws');
 const fs = require('fs');
 const { ProductManager, generateUniqueId } = require('./main');
 
 const app = express();
+expressWs(app);
+
 const port = 8080;
+
+// Configuración de Handlebars
+app.engine('handlebars', exphbs());
+app.set('views', 'src/views');
+app.set('views engine', 'handlebars')
 
 app.use(express.json());
 
@@ -60,6 +69,16 @@ app.delete('/api/products/:pid', (req, res) => {
   } else {
     res.status(404).json({ error: 'Producto no encontrado' });
   }
+});
+
+// Configuración de WebSocket
+app.ws('/api/ws', (ws, req) => {
+  // conexión 
+  ws.on('message', (msg) => {
+    // mensajes 
+    console.log(`Mensaje recibido: ${msg}`);
+    ws.send('Mensaje recibido por el servidor');
+  });
 });
 
 app.listen(port, () => {
