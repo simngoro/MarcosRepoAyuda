@@ -23,6 +23,7 @@
     "express-ws": "^5.0.2",
     "fs": "0.0.1-security",
     "fs.promises": "^0.1.2",
-    "jsonfile": "^6.1.0"
+    "jsonfile": "^6.1.0",
+    "mongoose": "^8.0.4"
   }
 }
