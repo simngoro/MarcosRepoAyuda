@@ -2,9 +2,8 @@ const express = require('express');
 const exphbs = require('express-handlebars');
 const expressWs = require('express-ws');
 const mongoose = require('mongoose');
-const { ProductManager, generateUniqueId } = require('./main');
+const { ProductManager, CartManager } = require('./main');
 const { initializeDB } = require('./models/db.js');
-
 
 const app = express();
 expressWs(app);
@@ -33,66 +32,228 @@ const ProductModel = mongoose.model('Product', {
   thumbnails: [String],
 });
 
-const productManager = new ProductManager('./productos.json');
-
-app.get('/api/products', (req, res) => {
-  const limit = parseInt(req.query.limit);
-  const products = productManager.getProducts(limit);
-  res.json({ products });
+// Modelo de Carrito con Mongoose
+const CartModel = mongoose.model('Cart', {
+  products: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+    },
+  ],
 });
 
-app.get('/api/products/:pid', (req, res) => {
-  const product = productManager.getProductById(req.params.pid);
-  if (product) {
-    res.json({ product });
-  } else {
-    res.status(404).json({ error: 'Producto no encontrado' });
+// Rutas para Productos
+app.get('/api/products', async (req, res) => {
+  try {
+    const { limit = 10, page = 1, query = '', sort = 'asc' } = req.query;
+    const skip = (page - 1) * limit;
+
+    let filter = {};
+    if (query) {
+      filter = { $text: { $search: query } };
+    }
+
+    const products = await ProductModel
+      .find(filter)
+      .sort({ price: sort === 'desc' ? -1 : 1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalProducts = await ProductModel.countDocuments(filter);
+    const totalPages = Math.ceil(totalProducts / limit);
+    const hasPrevPage = page > 1;
+    const hasNextPage = page < totalPages;
+
+    const prevLink = hasPrevPage ? `/api/products?limit=${limit}&page=${page - 1}&query=${query}&sort=${sort}` : null;
+    const nextLink = hasNextPage ? `/api/products?limit=${limit}&page=${page + 1}&query=${query}&sort=${sort}` : null;
+
+    res.json({
+      status: 'success',
+      payload: products,
+      totalPages,
+      prevPage: page - 1,
+      nextPage: page + 1,
+      currentPage: page,
+      hasPrevPage,
+      hasNextPage,
+      prevLink,
+      nextLink,
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', error: 'Error interno del servidor' });
   }
 });
 
+// Obtener un producto por ID
+app.get('/api/products/:pid', async (req, res) => {
+  try {
+    const product = await ProductModel.findById(req.params.pid);
+    if (product) {
+      res.json({ status: 'success', payload: product });
+    } else {
+      res.status(404).json({ status: 'error', error: 'Producto no encontrado' });
+    }
+  } catch (error) {
+    res.status(500).json({ status: 'error', error: 'Error interno del servidor' });
+  }
+});
+
+// Crear un nuevo producto
 app.post('/api/products', async (req, res) => {
-  const { title, description, code, price, stock, status, category, thumbnails } = req.body;
-  if (!title || !description || !code || !price || !stock || status === undefined || !category || !thumbnails || !Array.isArray(thumbnails) || thumbnails.length === 0) {
-    return res.status(400).json({ error: 'Todos los campos son obligatorios, incluyendo thumbnails como un array no vacío.' });
+  try {
+    const { title, description, code, price, stock, status, category, thumbnails } = req.body;
+    if (!title || !description || !code || !price || !stock || status === undefined || !category || !thumbnails || !Array.isArray(thumbnails) || thumbnails.length === 0) {
+      return res.status(400).json({ status: 'error', error: 'Todos los campos son obligatorios, incluyendo thumbnails como un array no vacío.' });
+    }
+
+    const newProduct = await ProductModel.create({
+      title,
+      description,
+      code,
+      price,
+      stock,
+      status,
+      category,
+      thumbnails,
+    });
+
+    res.json({ status: 'success', payload: newProduct });
+  } catch (error) {
+    res.status(500).json({ status: 'error', error: 'Error interno del servidor' });
   }
-
-  // Crear un nuevo producto con Mongoose
-  const newProduct = await ProductModel.create({
-    title,
-    description,
-    code,
-    price,
-    stock,
-    status,
-    category,
-    thumbnails,
-  });
-
-  productManager.addProduct(newProduct);
-  res.json({ product: newProduct });
 });
 
+// Actualizar un producto por ID
 app.put('/api/products/:pid', async (req, res) => {
-  const updatedProduct = await ProductModel.findByIdAndUpdate(
-    req.params.pid,
-    req.body,
-    { new: true }
-  );
+  try {
+    const updatedProduct = await ProductModel.findByIdAndUpdate(
+      req.params.pid,
+      req.body,
+      { new: true }
+    );
 
-  if (updatedProduct) {
-    res.json({ product: updatedProduct });
-  } else {
-    res.status(404).json({ error: 'Producto no encontrado' });
+    if (updatedProduct) {
+      res.json({ status: 'success', payload: updatedProduct });
+    } else {
+      res.status(404).json({ status: 'error', error: 'Producto no encontrado' });
+    }
+  } catch (error) {
+    res.status(500).json({ status: 'error', error: 'Error interno del servidor' });
   }
 });
 
+// Eliminar un producto por ID
 app.delete('/api/products/:pid', async (req, res) => {
-  const deletedProduct = await ProductModel.findByIdAndDelete(req.params.pid);
+  try {
+    const deletedProduct = await ProductModel.findByIdAndDelete(req.params.pid);
 
-  if (deletedProduct) {
-    res.json({ product: deletedProduct });
-  } else {
-    res.status(404).json({ error: 'Producto no encontrado' });
+    if (deletedProduct) {
+      res.json({ status: 'success', payload: deletedProduct });
+    } else {
+      res.status(404).json({ status: 'error', error: 'Producto no encontrado' });
+    }
+  } catch (error) {
+    res.status(500).json({ status: 'error', error: 'Error interno del servidor' });
+  }
+});
+
+// Rutas para Carritos
+app.get('/api/carts', async (req, res) => {
+  try {
+    const carts = await CartModel.find().populate('products');
+    res.json({ status: 'success', payload: carts });
+  } catch (error) {
+    res.status(500).json({ status: 'error', error: 'Error interno del servidor' });
+  }
+});
+
+app.get('/api/carts/:cid', async (req, res) => {
+  try {
+    const cart = await CartModel.findById(req.params.cid).populate('products');
+    if (cart) {
+      res.json({ status: 'success', payload: cart });
+    } else {
+      res.status(404).json({ status: 'error', error: 'Carrito no encontrado' });
+    }
+  } catch (error) {
+    res.status(500).json({ status: 'error', error: 'Error interno del servidor' });
+  }
+});
+
+app.post('/api/carts', async (req, res) => {
+  try {
+    const newCart = await CartModel.create({});
+    res.json({ status: 'success', payload: newCart });
+  } catch (error) {
+    res.status(500).json({ status: 'error', error: 'Error interno del servidor' });
+  }
+});
+
+app.put('/api/carts/:cid', async (req, res) => {
+  try {
+    const updatedCart = await CartModel.findByIdAndUpdate(
+      req.params.cid,
+      req.body,
+      { new: true }
+    ).populate('products');
+
+    if (updatedCart) {
+      res.json({ status: 'success', payload: updatedCart });
+    } else {
+      res.status(404).json({ status: 'error', error: 'Carrito no encontrado' });
+    }
+  } catch (error) {
+    res.status(500).json({ status: 'error', error: 'Error interno del servidor' });
+  }
+});
+
+app.put('/api/carts/:cid/products/:pid', async (req, res) => {
+  try {
+    const { quantity } = req.body;
+    if (typeof quantity !== 'number' || quantity <= 0) {
+      return res.status(400).json({ status: 'error', error: 'La cantidad debe ser un número positivo' });
+    }
+
+    const cart = await CartModel.findById(req.params.cid);
+    if (!cart) {
+      return res.status(404).json({ status: 'error', error: 'Carrito no encontrado' });
+    }
+
+    const product = await ProductModel.findById(req.params.pid);
+    if (!product) {
+      return res.status(404).json({ status: 'error', error: 'Producto no encontrado' });
+    }
+
+    const existingProductIndex = cart.products.findIndex(p => p._id.toString() === req.params.pid);
+    if (existingProductIndex !== -1) {
+      // Si el producto ya está en el carrito, actualiza la cantidad
+      cart.products[existingProductIndex].quantity = quantity;
+    } else {
+      // Si el producto no está en el carrito, agrégalo con la cantidad especificada
+      cart.products.push({
+        _id: product._id,
+        quantity,
+      });
+    }
+
+    const updatedCart = await cart.save().populate('products');
+    res.json({ status: 'success', payload: updatedCart });
+  } catch (error) {
+    res.status(500).json({ status: 'error', error: 'Error interno del servidor' });
+  }
+});
+
+app.delete('/api/carts/:cid', async (req, res) => {
+  try {
+    const deletedCart = await CartModel.findByIdAndDelete(req.params.cid);
+
+    if (deletedCart) {
+      res.json({ status: 'success', payload: deletedCart });
+    } else {
+      res.status(404).json({ status: 'error', error: 'Carrito no encontrado' });
+    }
+  } catch (error) {
+    res.status(500).json({ status: 'error', error: 'Error interno del servidor' });
   }
 });
 
