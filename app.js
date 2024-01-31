@@ -2,6 +2,9 @@ const express = require('express');
 const exphbs = require('express-handlebars');
 const expressWs = require('express-ws');
 const mongoose = require('mongoose');
+const session = require('express-session');
+const bcrypt = require('bcrypt');
+const { User } = require('./models/user');
 const { ProductManager, CartManager } = require('./main');
 const { initializeDB } = require('./models/db.js');
 
@@ -16,6 +19,30 @@ app.set('views', 'src/views');
 app.set('view engine', 'handlebars');
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Configuración de la sesión
+app.use(session({
+  secret: 'tu_secreto',
+  resave: true,
+  saveUninitialized: true,
+}));
+
+// Middleware para verificar la sesión
+app.use((req, res, next) => {
+  if (req.session.user) {
+    res.locals.user = req.session.user;
+  }
+  next();
+});
+
+// Rutas para sesiones
+const sessionsRouter = require('./routes/sessions');
+app.use('/api/sessions', sessionsRouter);
+
+// Rutas para vistas
+const viewsRouter = require('./routes/views');
+app.use('/', viewsRouter);
 
 // Conectar a la base de datos MongoDB
 initializeDB();
@@ -84,7 +111,6 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// Obtener un producto por ID
 app.get('/api/products/:pid', async (req, res) => {
   try {
     const product = await ProductModel.findById(req.params.pid);
@@ -98,7 +124,6 @@ app.get('/api/products/:pid', async (req, res) => {
   }
 });
 
-// Crear un nuevo producto
 app.post('/api/products', async (req, res) => {
   try {
     const { title, description, code, price, stock, status, category, thumbnails } = req.body;
@@ -123,7 +148,6 @@ app.post('/api/products', async (req, res) => {
   }
 });
 
-// Actualizar un producto por ID
 app.put('/api/products/:pid', async (req, res) => {
   try {
     const updatedProduct = await ProductModel.findByIdAndUpdate(
@@ -142,7 +166,6 @@ app.put('/api/products/:pid', async (req, res) => {
   }
 });
 
-// Eliminar un producto por ID
 app.delete('/api/products/:pid', async (req, res) => {
   try {
     const deletedProduct = await ProductModel.findByIdAndDelete(req.params.pid);
@@ -226,10 +249,9 @@ app.put('/api/carts/:cid/products/:pid', async (req, res) => {
 
     const existingProductIndex = cart.products.findIndex(p => p._id.toString() === req.params.pid);
     if (existingProductIndex !== -1) {
-      // Si el producto ya está en el carrito, actualiza la cantidad
+      // aca se actualiza la cantidad
       cart.products[existingProductIndex].quantity = quantity;
     } else {
-      // Si el producto no está en el carrito, agrégalo con la cantidad especificada
       cart.products.push({
         _id: product._id,
         quantity,
