@@ -3,6 +3,9 @@ const exphbs = require('express-handlebars');
 const expressWs = require('express-ws');
 const mongoose = require('mongoose');
 const session = require('express-session');
+const passport = require('passport');
+const LocalStrategy = require('passport-local').Strategy;
+const GitHubStrategy = require('passport-github').Strategy;
 const bcrypt = require('bcrypt');
 const { User } = require('./models/user');
 const { ProductManager, CartManager } = require('./main');
@@ -28,6 +31,51 @@ app.use(session({
   saveUninitialized: true,
 }));
 
+// Configuración de Passport
+passport.use(new LocalStrategy(async (username, password, done) => {
+  try {
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return done(null, false, { message: 'Usuario no encontrado' });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatch) {
+      return done(null, false, { message: 'Contraseña incorrecta' });
+    }
+
+    return done(null, user);
+  } catch (error) {
+    return done(error);
+  }
+}));
+
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (error) {
+    done(error);
+  }
+});
+
+passport.use(new GitHubStrategy({
+  clientID: 'your-client-id',
+  clientSecret: 'your-client-secret',
+  callbackURL: 'http://your-app-url/auth/github/callback',
+}, (accessToken, refreshToken, profile, done) => {
+  // 
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
 // Middleware para verificar la sesión
 app.use((req, res, next) => {
   if (req.session.user) {
@@ -36,18 +84,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rutas para sesiones
+// Rutas para sesiones y registro
 const sessionsRouter = require('./routes/sessions');
+const registerRouter = require('./routes/register');
 app.use('/api/sessions', sessionsRouter);
-
-// Rutas para vistas
-const viewsRouter = require('./routes/views');
-app.use('/', viewsRouter);
+app.use('/api/register', registerRouter);
 
 // Conectar a la base de datos MongoDB
 initializeDB();
 
-// Modelo de Producto con Mongoose
+// Producto con Mongoose
 const ProductModel = mongoose.model('Product', {
   title: String,
   description: String,
@@ -59,7 +105,7 @@ const ProductModel = mongoose.model('Product', {
   thumbnails: [String],
 });
 
-// Modelo de Carrito con Mongoose
+//  Carrito con Mongoose
 const CartModel = mongoose.model('Cart', {
   products: [
     {
@@ -249,7 +295,7 @@ app.put('/api/carts/:cid/products/:pid', async (req, res) => {
 
     const existingProductIndex = cart.products.findIndex(p => p._id.toString() === req.params.pid);
     if (existingProductIndex !== -1) {
-      // aca se actualiza la cantidad
+      
       cart.products[existingProductIndex].quantity = quantity;
     } else {
       cart.products.push({
