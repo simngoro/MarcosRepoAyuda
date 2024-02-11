@@ -32,9 +32,21 @@ app.use(session({
 }));
 
 // Configuración de Passport
-passport.use(new LocalStrategy(async (username, password, done) => {
+const UserSchema = new mongoose.Schema({
+  first_name: String,
+  last_name: String,
+  email: { type: String, unique: true },
+  age: String,
+  password: String,
+  cart: { type: mongoose.Schema.Types.ObjectId, ref: 'Cart' },
+  role: { type: String, default: 'User' }
+});
+
+const UserModel = mongoose.model('User', UserSchema); 
+
+passport.use(new LocalStrategy({ usernameField: 'email' }, async (email, password, done) => {
   try {
-    const user = await User.findOne({ username });
+    const user = await UserModel.findOne({ email });
 
     if (!user) {
       return done(null, false, { message: 'Usuario no encontrado' });
@@ -58,7 +70,7 @@ passport.serializeUser((user, done) => {
 
 passport.deserializeUser(async (id, done) => {
   try {
-    const user = await User.findById(id);
+    const user = await UserModel.findById(id);
     done(null, user);
   } catch (error) {
     done(error);
