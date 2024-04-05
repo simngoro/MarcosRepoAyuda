@@ -96,36 +96,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rutas para sesiones y registro
-const sessionsRouter = require('./routes/sessions');
-const registerRouter = require('./routes/register');
-app.use('/api/sessions', sessionsRouter);
-app.use('/api/register', registerRouter);
-
-// Conectar a la base de datos MongoDB
-initializeDB();
-
-// Producto con Mongoose
-const ProductModel = mongoose.model('Product', {
-  title: String,
-  description: String,
-  code: String,
-  price: Number,
-  stock: Number,
-  status: Boolean,
-  category: String,
-  thumbnails: [String],
-});
-
-//  Carrito con Mongoose
-const CartModel = mongoose.model('Cart', {
-  products: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-    },
-  ],
-});
 
 // Rutas para Productos
 app.get('/api/products', async (req, res) => {
